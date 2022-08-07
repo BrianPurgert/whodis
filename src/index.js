@@ -5,8 +5,6 @@ import { createTTSMp3File, deleteTTSMp3File } from './tiktok-tts.js';
 
 dotenv.config();
 
-const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
-
 const discordClient = new discord.Client({ intents: ['GuildVoiceStates'] });
 
 let currentlyWorking = false;
@@ -49,4 +47,4 @@ discordClient.on('voiceStateUpdate', async (oldState, newState) => {
   }
 });
 
-discordClient.login(DISCORD_BOT_TOKEN);
+discordClient.login(process.env.DISCORD_BOT_TOKEN);
