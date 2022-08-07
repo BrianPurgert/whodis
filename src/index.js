@@ -6,7 +6,6 @@ import { createTTSMp3File, deleteTTSMp3File } from './tiktok-tts.js';
 dotenv.config();
 
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN;
-const DISCORD_BOT_MEMBER_ID = process.env.DISCORD_BOT_MEMBER_ID;
 
 const discordClient = new discord.Client({ intents: ['GuildVoiceStates'] });
 
@@ -43,7 +42,7 @@ discordClient.on('voiceStateUpdate', async (oldState, newState) => {
   if (
     newState.channel && // The new state had something to do with a channel
     newState.channel.name !== oldState.channel?.name && // It was a channel join / change event
-    newState.member?.id !== DISCORD_BOT_MEMBER_ID && // It was not an event triggered by the bot itself
+    newState.member?.user.id !== discordClient.user.id && // It was not an event triggered by the bot itself
     newState.channel.members.array().length !== 1 // There's more than one person in the channel
   ) {
     await say(newState.member.displayName, newState.member.voice.channelID);
