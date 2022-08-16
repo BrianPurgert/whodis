@@ -21,15 +21,28 @@ async function say(message, voiceChannelId) {
   const channel = await discordClient.channels.fetch(voiceChannelId);
   const connection = await channel.join();
 
+  // Wait for some time after connecting because it's too jarring to
+  // hear the announcement before Discord's connection tone even finishes
+  // playing.
+  await wait(250);
+
   const dispatcher = connection.play('./tts.mp3');
   await new Promise((resolve) => {
     dispatcher.on('finish', resolve);
   });
 
+  // Wait for some time before disconnecting as well because again it's jarring
+  // to hear the disconnect tone almost instantly after the announcement is done.
+  await wait(250);
+
   connection.disconnect();
   await deleteTTSMp3File();
 
   currentlyWorking = false;
+}
+
+async function wait(timeMs) {
+  return new Promise((resolve) => setTimeout(resolve, timeMs));
 }
 
 discordClient.on('ready', () => {
