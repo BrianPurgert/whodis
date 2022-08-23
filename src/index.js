@@ -1,7 +1,8 @@
 import discord from 'discord.js';
 import dotenv from 'dotenv';
 import process from 'process';
-import { createTTSMp3File, deleteTTSMp3File } from './tiktok-tts.js';
+import { speakWithStreamLabsVoice } from './streamlabs-tts.js';
+import { speakWithTikTokVoice } from './tiktok-tts.js';
 
 dotenv.config();
 
@@ -16,8 +17,6 @@ async function say(message, voiceChannelId) {
 
   currentlyWorking = true;
 
-  await createTTSMp3File(message);
-
   const channel = await discordClient.channels.fetch(voiceChannelId);
   const connection = await channel.join();
 
@@ -26,17 +25,17 @@ async function say(message, voiceChannelId) {
   // playing.
   await wait(250);
 
-  const dispatcher = connection.play('./tts.mp3');
-  await new Promise((resolve) => {
-    dispatcher.on('finish', resolve);
-  });
+  try {
+    await speakWithTikTokVoice(message, connection);
+  } catch {
+    await speakWithStreamLabsVoice(message, connection);
+  }
 
   // Wait for some time before disconnecting as well because again it's jarring
   // to hear the disconnect tone almost instantly after the announcement is done.
   await wait(250);
 
   connection.disconnect();
-  await deleteTTSMp3File();
 
   currentlyWorking = false;
 }
