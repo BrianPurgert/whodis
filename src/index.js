@@ -2,7 +2,6 @@ import discord from 'discord.js';
 import dotenv from 'dotenv';
 import process from 'process';
 import { speakWithStreamLabsVoice } from './streamlabs-tts.js';
-import { speakWithTikTokVoice } from './tiktok-tts.js';
 
 dotenv.config();
 
@@ -20,15 +19,19 @@ async function say(message, voiceChannelId) {
   const channel = await discordClient.channels.fetch(voiceChannelId);
   const connection = await channel.join();
 
-  try {
-    await speakWithTikTokVoice(message, connection);
-  } catch {
-    await speakWithStreamLabsVoice(message, connection);
-  }
+  // Wait before speaking and before disconnecting to make things
+  // less jarring.
+  await wait(500);
+  await speakWithStreamLabsVoice(message, connection);
+  await wait(200);
 
   connection.disconnect();
 
   currentlyWorking = false;
+}
+
+async function wait(timeMs) {
+  return new Promise((resolve) => setTimeout(resolve, timeMs));
 }
 
 discordClient.on('ready', () => {
