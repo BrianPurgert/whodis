@@ -2,8 +2,8 @@
   "name": "WhoDis",
   "version": "1.0.0",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "start": "pm2 start index.js --name whodis --log './log' --time --merge-logs --instances 1 --no-daemon",
+    "dev": "nodemon index.js"
   },
   "type": "module",
   "private": true,
@@ -12,7 +12,8 @@
     "discord.js": "^12.5.3",
     "dotenv": "^16.0.1",
     "ffmpeg-static": "^5.0.2",
-    "node-fetch": "^3.2.10"
+    "node-fetch": "^3.2.10",
+    "pm2": "^5.2.2"
   },
   "devDependencies": {
     "nodemon": "^2.0.19"
