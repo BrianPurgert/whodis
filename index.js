@@ -1,14 +1,36 @@
 import discord from 'discord.js';
 import dotenv from 'dotenv';
-import process from 'process';
+import getStream from 'get-stream';
+import Minio from 'minio';
 import fetch from 'node-fetch';
+import { env } from 'process';
 
 dotenv.config();
 
 const discordClient = new discord.Client({ intents: ['GuildVoiceStates'] });
-let currentlyWorking = false;
 
-export async function speakWithStreamLabsVoice(text, connection) {
+let customSoundsConfig;
+
+/** @type {Minio.Client} */ let minio;
+
+if (env.CUSTOM_SOUNDS_CONFIG_S3_PATH) {
+  minio = new Minio.Client({
+    endPoint: env.CUSTOM_SOUNDS_S3_ENDPOINT,
+    useSSL: true,
+    accessKey: env.CUSTOM_SOUNDS_S3_ACCESS_KEY_ID,
+    secretKey: env.CUSTOM_SOUNDS_S3_SECRET_ACCESS_KEY,
+  });
+
+  const customSoundsConfigStream = await minio.getObject(
+    env.CUSTOM_SOUNDS_S3_BUCKET_NAME,
+    env.CUSTOM_SOUNDS_CONFIG_S3_PATH
+  );
+
+  const customSoundsConfigString = await getStream(customSoundsConfigStream);
+  customSoundsConfig = JSON.parse(customSoundsConfigString);
+}
+
+async function getStreamLabsVoiceUrl(text) {
   const response = await fetch('https://streamlabs.com/polly/speak', {
     method: 'POST',
     headers: {
@@ -21,13 +43,12 @@ export async function speakWithStreamLabsVoice(text, connection) {
   });
 
   const responseJson = await response.json();
-  const audioUrl = responseJson.speak_url;
-
-  const dispatcher = await connection.play(audioUrl);
-  await new Promise((resolve) => dispatcher.on('finish', resolve));
+  return responseJson.speak_url;
 }
 
-async function say(message, voiceChannelId) {
+let currentlyWorking = false;
+
+async function playAudioUrlInVoiceChannel(audioUrl, voiceChannelId) {
   if (currentlyWorking) {
     return;
   }
@@ -37,19 +58,12 @@ async function say(message, voiceChannelId) {
   const channel = await discordClient.channels.fetch(voiceChannelId);
   const connection = await channel.join();
 
-  // Wait before speaking and before disconnecting to make things
-  // less jarring.
-  await wait(500);
-  await speakWithStreamLabsVoice(message, connection);
-  await wait(200);
+  const dispatcher = await connection.play(audioUrl);
+  await new Promise((resolve) => dispatcher.on('finish', resolve));
 
   connection.disconnect();
 
   currentlyWorking = false;
-}
-
-async function wait(timeMs) {
-  return new Promise((resolve) => setTimeout(resolve, timeMs));
 }
 
 discordClient.on('ready', () => {
@@ -63,8 +77,19 @@ discordClient.on('voiceStateUpdate', async (oldState, newState) => {
     newState.member?.user.id !== discordClient.user.id && // It was not an event triggered by the bot itself
     newState.channel.members.array().length !== 1 // There's more than one person in the channel
   ) {
-    await say(newState.member.displayName, newState.member.voice.channelID);
+    let audioUrl;
+
+    if (customSoundsConfig?.DiscordUserIdToS3Path?.[newState.member.user.id]) {
+      audioUrl = await minio.presignedGetObject(
+        env.CUSTOM_SOUNDS_S3_BUCKET_NAME,
+        customSoundsConfig.DiscordUserIdToS3Path[newState.member.user.id]
+      );
+    } else {
+      audioUrl = await getStreamLabsVoiceUrl(newState.member.displayName);
+    }
+
+    await playAudioUrlInVoiceChannel(audioUrl, newState.member.voice.channelID);
   }
 });
 
-discordClient.login(process.env.DISCORD_BOT_TOKEN);
+discordClient.login(env.DISCORD_BOT_TOKEN);
